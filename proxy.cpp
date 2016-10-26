@@ -165,7 +165,7 @@ void Proxy::acceptLoop(){
                 //storing data
                 do{
                     tmp_buff = readDataMax(serverSide.socket_server, MAX_BUFFER_SIZE);
-                    
+
                     copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
                 }while(tmp_buff.size());
 
