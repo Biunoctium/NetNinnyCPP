@@ -14,7 +14,7 @@ bool checkType(string type, vector<char> buffer);
 
 int main(int argc, char **argv){
     /**
-     * CHECKING ERROR ON CALL
+     * CHECKING ERROR ON CALL, requirement #7
      */
     if(argc != 2){
         perror("Bad call, one argument needed");
@@ -37,6 +37,7 @@ int main(int argc, char **argv){
     /**
      * RUNNING PROXY NOW
      */
+    //requirement #7, choosing port
     Proxy proxy(argv[1]);
     //now proxy is listening
     cout << "launching connection" << endl;
@@ -169,7 +170,11 @@ void Proxy::acceptLoop(){
                     copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
                 }while(tmp_buff.size());
 
-                //PAS TOUCHER AU IF
+                /**
+                 * REQUIREMENT #4 handling bad content
+                 * REQUIREMENT #8 check for compressed content
+                 */
+
                 if(!checkType("gzip", total_buff) && filter.process(total_buff.data())){
                     vector<char> new_req{};
                     new_req = editHeader(false);
@@ -181,7 +186,7 @@ void Proxy::acceptLoop(){
                         copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
                     }while(tmp_buff.size());
                 }
-                //PAS TOUCHER À ÇA
+
                 sendData(clientSide.socket_client, total_buff);
 
                 close(serverSide.socket_server);
@@ -189,8 +194,11 @@ void Proxy::acceptLoop(){
                 exit(0);
             }
             //sending the request
+            /**
+             * REQUIREMENT #3 handling bad URLs
+             */
             if (filter.process(buffer.data())) {
-                cout << "buffer 1 = " << buffer.data() << endl;
+                //cout << "buffer 1 = " << buffer.data() << endl;
                 // Edit the header to redirect to error URL page
                 vector<char> new_req{};
                 new_req = editHeader(true);
@@ -202,7 +210,7 @@ void Proxy::acceptLoop(){
                     copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(buffer));
                 }while(tmp_buff.size());
 
-                cout << "buff = " << buffer.data() << endl;
+                //cout << "buff = " << buffer.data() << endl;
 
             }
             //keepAliveToClose(buffer);
@@ -251,6 +259,13 @@ bool Proxy::parseForHostname(string request, string &hostname, string &portnumbe
     return false;
 }
 
+/**
+ * (requirement #2)
+ * reading data from the mentionned socket, returning this data
+ * @param socket
+ * @param maxRead the number of bytes to read
+ * @return the data read
+ */
 vector<char> readDataMax(int socket, size_t maxRead){
     vector<char> buffer;
     char *buf_array = new char[maxRead];
@@ -266,6 +281,13 @@ vector<char> readDataMax(int socket, size_t maxRead){
     return buffer;
 }
 
+/**
+ * (requirement #2)
+ * Sending data to the mentionned socket
+ * @param socket
+ * @param buffer
+ * @return -1 if any problem
+ */
 int sendData(int socket, vector<char> buffer){
     ssize_t bytes_sent = 0;
     size_t total_sent = 0;
@@ -310,6 +332,7 @@ void keepAliveToClose(vector<char> &vect_request){
 }
 
 /**
+ * (requirement #3 + #4)
  * edit the header for redirection
  * @param url if we find a bad word in the URL ==> true ; else it's in the content : call with false
  * @param buffer to analyze
@@ -344,6 +367,7 @@ vector<char> editHeader(bool url){
 
 
 /**
+ * (requirement 8)
  * Check if the buffer is of type asked
  * @param type to compare
  * @param buffer to analyze

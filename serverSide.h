@@ -1,7 +1,3 @@
-//
-// Created by biu on 14/10/16.
-//
-
 #ifndef NETNINNYCPP_SERVERSIDE_H
 #define NETNINNYCPP_SERVERSIDE_H
 

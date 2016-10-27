@@ -20,7 +20,7 @@ ServerSide::ServerSide(string host, string port, ClientSide &client) : socket_se
  * @return -1 if failure, else 0
  */
 int ServerSide::openConnection(){
-    cout << "hello open connection" << endl;
+    //cout << "hello open connection" << endl;
 
     struct addrinfo *rp;
 

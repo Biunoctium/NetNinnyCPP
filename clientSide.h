@@ -1,7 +1,3 @@
-//
-// Created by biu on 18/10/16.
-//
-
 #ifndef NETNINNYCPP_CLIENTSIDE_H
 #define NETNINNYCPP_CLIENTSIDE_H
 
