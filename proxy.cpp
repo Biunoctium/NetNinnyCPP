@@ -11,6 +11,7 @@ std::vector<char> readDataMax(int socket, size_t maxRead);
 int sendData(int socket, std::vector<char> buffer);
 vector<char> editHeader(bool url);
 bool checkType(string type, vector<char> buffer);
+bool check_Content_Type_Text(vector<char> buffer);
 
 int main(int argc, char **argv){
     /**
@@ -172,10 +173,11 @@ void Proxy::acceptLoop(){
 
                 /**
                  * REQUIREMENT #4 handling bad content
+                 * REQUIREMENT #5 no limit on size
                  * REQUIREMENT #8 check for compressed content
                  */
 
-                if(!checkType("gzip", total_buff) && filter.process(total_buff.data())){
+                if(!checkType("gzip", total_buff) && check_Content_Type_Text(total_buff) && filter.process(total_buff.data())){
                     vector<char> new_req{};
                     new_req = editHeader(false);
                     sendData(clientSide.socket_client, new_req);
@@ -213,7 +215,7 @@ void Proxy::acceptLoop(){
                 //cout << "buff = " << buffer.data() << endl;
 
             }
-            //keepAliveToClose(buffer);
+            keepAliveToClose(buffer);
             sendData(serverSide.socket_server, buffer);
 
 
@@ -313,7 +315,7 @@ void keepAliveToClose(vector<char> &vect_request){
     string pattern = "\r\nConnection: ";
     string pattern2 = "\r\n";
     vector<char> vect1;
-    string word; //the part to change if it's necessary
+    string word; //the part to change
     vector<char> vect2;
     vector<char> vect3;
     pos_start = request.find(pattern);
@@ -338,7 +340,6 @@ void keepAliveToClose(vector<char> &vect_request){
  * @param buffer to analyze
  */
 vector<char> editHeader(bool url){
-    //string data{buffer.data()};
     vector<char> new_req{};
     string data{};
     string new_URL;
@@ -373,7 +374,27 @@ vector<char> editHeader(bool url){
  * @param buffer to analyze
  * @return true if the buffer is of type asked, else false
  */
+
 bool checkType(string type, vector<char> buffer){
-    regex expr{"^Content-Encoding: .*" + type + ".*$", regex_constants::icase};
-    return (regex_match(buffer.data(), expr));
+    regex expr1{"^Content-Encoding: .*" + type + ".*$", regex_constants::icase};
+    return (regex_match(buffer.data(), expr1));
+}
+
+
+
+/**
+ * (requirement 5)
+ * true : doesn't contain "content type" ==> ok for filtering OR has "content tpe" and "text" ==> filter
+ * false : has "content type" but not text ==> no filter
+ * */
+bool check_Content_Type_Text(vector<char> buffer){
+    bool res;
+    regex expr1{"^Content-Type: *$", regex_constants::icase};
+    if(regex_match(buffer.data(), expr1)){
+        regex expr2{"^Content-Type: .*text.*$", regex_constants::icase};
+        res = regex_match(buffer.data(), expr2);
+    } else{
+        res = true;
+    }
+    return res;
 }
