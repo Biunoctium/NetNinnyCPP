@@ -10,7 +10,7 @@ void keepAliveToClose(std::vector<char> &vect_request);
 std::vector<char> readDataMax(int socket, size_t maxRead);
 int sendData(int socket, std::vector<char> buffer);
 vector<char> editHeader(bool url);
-bool checkType(string type, vector<char> buffer);
+bool checkGZIP(vector<char> buffer);
 bool check_Content_Type_Text(vector<char> buffer);
 
 int main(int argc, char **argv){
@@ -41,7 +41,7 @@ int main(int argc, char **argv){
     //requirement #7, choosing port
     Proxy proxy(argv[1]);
     //now proxy is listening
-    cout << "launching connection" << endl;
+    cout << "launching connection 2" << endl;
     proxy.acceptLoop();
 
 
@@ -158,38 +158,58 @@ void Proxy::acceptLoop(){
             if(!fork()){ //different thread to send results to client
                 vector<char> tmp_buff;
                 vector<char> total_buff;
-               /* do {
-                    tmp_buff = readDataMax(serverSide.socket_server, MAX_BUFFER_SIZE);
-                    sendData(clientSide.socket_client, tmp_buff);
+                bool text = false;
+                bool gzip = true;
+                bool go_filter = false;
 
-                } while (tmp_buff.size() > 0);
-                */
-                //storing data
                 do{
                     tmp_buff = readDataMax(serverSide.socket_server, MAX_BUFFER_SIZE);
 
-                    copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
+                    /**
+                     * REQUIREMENT #8 CHECK FOR COMPRESSED CONTENT
+                     */
+                    if(gzip && !tmp_buff.empty()){
+                        gzip = checkGZIP(tmp_buff);
+                    }
+                    /**
+                     * REQUIREMENT #5 no limit on size
+                     */
+                    if(!text && !tmp_buff.empty()) {
+                        text = check_Content_Type_Text(tmp_buff);
+                    }
+
+                    if(text && !gzip && !tmp_buff.empty()){
+                        go_filter = true;
+                        copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
+                    }else{
+                        //send on the fly
+                        sendData(clientSide.socket_client, tmp_buff);
+                    }
+
                 }while(tmp_buff.size());
+
+                text = false;
+                gzip = true;
+                tmp_buff.clear();
 
                 /**
                  * REQUIREMENT #4 handling bad content
-                 * REQUIREMENT #5 no limit on size
-                 * REQUIREMENT #8 check for compressed content
                  */
 
-                if(!checkType("gzip", total_buff) && check_Content_Type_Text(total_buff) && filter.process(total_buff.data())){
-                    vector<char> new_req{};
-                    new_req = editHeader(false);
-                    sendData(clientSide.socket_client, new_req);
-                    tmp_buff.clear();
-                    total_buff.clear();
-                    do{
-                        tmp_buff = readDataMax(serverSide.socket_server, MAX_BUFFER_SIZE);
-                        copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
-                    }while(tmp_buff.size());
+                if(go_filter){
+                    if(filter.process(total_buff.data())){
+                        vector<char> new_req{};
+                        new_req = editHeader(false);
+                        sendData(clientSide.socket_client, new_req);
+                        tmp_buff.clear();
+                        total_buff.clear();
+                        do {
+                            tmp_buff = readDataMax(serverSide.socket_server, MAX_BUFFER_SIZE);
+                            copy(tmp_buff.begin(), tmp_buff.end(), back_inserter(total_buff));
+                        } while (tmp_buff.size());
+                    }
+                    sendData(clientSide.socket_client, total_buff);
                 }
-
-                sendData(clientSide.socket_client, total_buff);
 
                 close(serverSide.socket_server);
                 close(clientSide.socket_client);
@@ -200,7 +220,6 @@ void Proxy::acceptLoop(){
              * REQUIREMENT #3 handling bad URLs
              */
             if (filter.process(buffer.data())) {
-                //cout << "buffer 1 = " << buffer.data() << endl;
                 // Edit the header to redirect to error URL page
                 vector<char> new_req{};
                 new_req = editHeader(true);
@@ -213,8 +232,8 @@ void Proxy::acceptLoop(){
                 }while(tmp_buff.size());
 
                 //cout << "buff = " << buffer.data() << endl;
-
             }
+
             keepAliveToClose(buffer);
             sendData(serverSide.socket_server, buffer);
 
@@ -375,26 +394,36 @@ vector<char> editHeader(bool url){
  * @return true if the buffer is of type asked, else false
  */
 
-bool checkType(string type, vector<char> buffer){
-    regex expr1{"^Content-Encoding: .*" + type + ".*$", regex_constants::icase};
-    return (regex_match(buffer.data(), expr1));
+bool checkGZIP(vector<char> buffer){
+    /*regex expr1{"^Content-Encoding: .*" + type + ".*$", regex_constants::icase};
+    return (regex_match(buffer.data(), expr1));*/
+    string buf = buffer.data();
+    string pattern{"Content-Encoding: gzip"};
+    return(buf.find(pattern) != string::npos);
 }
-
-
 
 /**
  * (requirement 5)
- * true : doesn't contain "content type" ==> ok for filtering OR has "content tpe" and "text" ==> filter
+ * true : doesn't contain "content type" ==> ok for filtering OR has "content type" and "text" ==> filter
  * false : has "content type" but not text ==> no filter
  * */
 bool check_Content_Type_Text(vector<char> buffer){
+    //cout << buffer.data() << endl;
+
+    string pattern1{"Content-Type: "};
+    string pattern2{"Content-Type: text"};
+    string buf = buffer.data();
+
     bool res;
-    regex expr1{"^Content-Type: *$", regex_constants::icase};
-    if(regex_match(buffer.data(), expr1)){
-        regex expr2{"^Content-Type: .*text.*$", regex_constants::icase};
-        res = regex_match(buffer.data(), expr2);
-    } else{
+    if(buf.find(pattern1) != string::npos){
+        res = false;
+        if(buf.find(pattern2) != string::npos){
+            res = true;
+        }
+    }else{
         res = true;
     }
     return res;
 }
+
+
